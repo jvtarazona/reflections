@@ -1,0 +1,57 @@
+CREATE MINING STRUCTURE [Wine Sales Interleaved]
+(
+[Month] DATE KEY TIME,
+[Series] TEXT KEY,
+[Category] TEXT DISCRETE,
+[Sales] DOUBLE CONTINUOUS
+)
+
+// (b) Adding an interleaved model
+ALTER MINING STRUCTURE [Wine Sales Interleaved]
+ADD MINING MODEL [Reds Interleaved]
+(
+[Month],
+[Series],
+[Sales] PREDICT
+) USING Microsoft_Time_Series
+WITH DRILLTHROUGH,
+FILTER([Category] = ‘Red’)
+
+// (b) Processing interleaved structure
+INSERT INTO MINING STRUCTURE [Wine Sales Interleaved]
+( [Month], [Series], [Category], [Sales] )
+OPENQUERY ([Chapter8Data],
+’SELECT * FROM
+(SELECT [Month],
+[Type],
+CASE [Type] WHEN ‘’Red‘’ THEN ‘’Red‘’
+WHEN ‘’Rose‘’ THEN ‘’Red‘’
+WHEN ‘’Fortified‘’ THEN ‘’Red‘’
+ELSE ‘’White‘’
+END AS [Category],
+[Sales]
+FROM [Wine Sales2]
+UNION ALL
+SELECT [Month], ‘’Red Average‘’ AS [Type],
+‘’Red‘’ AS [Category], SUM(Sales)/3 AS [Sales]
+FROM [Wine Sales2] t
+WHERE t.[Type] IN (‘’Red‘’, ‘’Fortified‘’, ‘’Rose‘’)
+GROUP BY [Month]
+UNION ALL
+SELECT [Month], ‘’White Average‘’ AS [Type],
+‘’White‘’ AS [Category], SUM(Sales)/3 AS [Sales]
+FROM [Wine Sales2] t
+WHERE t.[Type] IN (‘’Dry White‘’, ‘’Sweet White‘’, ‘’Sparkling‘’)
+GROUP BY [Month]) t
+ORDER BY [Month], [Type]’)
+
+webmaster@seppelec.com
+ef_via_web
+
+SELECT FLATTENED
+PredictTimeSeries([Red], 3, 12, EXTEND_MODEL_CASES)
+FROM [Reds]
+NATURAL PREDICTION JOIN
+(SELECT 1 AS [Month], 4520 AS [Red]
+UNION SELECT 2 AS [Month], 4000 AS [Red]) as t
+
